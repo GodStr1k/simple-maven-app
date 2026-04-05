@@ -1,41 +1,52 @@
 pipeline {
 agent any
 environment {
-KUBECONFIG="C:\\kubeconfig"
-DOCKER_IMAGE = "godstr1k/html-demo"
+KUBECONFIG = "C:\\kubeconfig"
+DOCKER_IMAGE = " godstr1k/java-app:latest"
 }
 stages {
-stage('Clone Code') {
+stage('Clone Repository') {
 steps {
 git branch: 'main',
-url: 'https://github.com/GodStr1k/html-cicd.git'
+url: 'https://github.com/GodStr1k/maven_docker_try.git'
 }
 }
-
+stage('Build with Maven') {
+steps {
+bat 'mvn clean package'
+}
+}
 stage('Build Docker Image') {
 steps {
-bat 'docker build -t %DOCKER_IMAGE% .'
+bat "docker build -t %DOCKER_IMAGE% ."
 }
 }
-stage('Push Image') {
+stage('Push to DockerHub') {
 steps {
-withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
-usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-bat 'docker login -u %USER% -p %PASS%'
-bat 'docker push %DOCKER_IMAGE%'
+withCredentials([usernamePassword(
+credentialsId: 'dockerhub-creds',
+usernameVariable: 'DOCKER_USER',
+passwordVariable: 'DOCKER_PASS'
+)]) {
+bat """
+docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+docker push %DOCKER_IMAGE%
+"""
 }
 }
 }
 stage('Deploy to Kubernetes') {
 steps {
-withCredentials([file(credentialsId: 'kubeconfig', variable:
-'KUBECONFIG')]) {
-bat '''
-set KUBECONFIG=%KUBECONFIG%
-kubectl apply -f deployment.yaml --validate=false
-'''
+bat 'kubectl apply -f Deployment.yaml'
 }
 }
+}
+post {
+success {
+echo 'CI/CD Pipeline executed successfully!'
+}
+failure {
+echo 'Pipeline failed. Please check logs.'
 }
 }
 }
